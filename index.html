@@ -984,7 +984,7 @@ $("btnReset").addEventListener("click",e=>{if(!resetArmed){resetArmed=true;e.cur
 
 /* ---------- database: shared settings + one document per month ---------- */
 /* Outside Claude the same page stores its data in a Firebase Realtime Database (set FIREBASE_URL). */
-const FIREBASE_URL="";const FB_ROOT="assembly-monthly";
+const FIREBASE_URL="https://end-yaniv-default-rtdb.europe-west1.firebasedatabase.app";const FB_ROOT="assembly-monthly";
 function fbDB(base){base=base.replace(/\/+$/,"")+"/"+FB_ROOT;
   const url=p=>base+"/"+p.split("/").map(encodeURIComponent).join("/")+".json";
   const snap=(id,v)=>({id,exists:v!==null&&v!==undefined,data:()=>v===null?undefined:v,metadata:{}});
