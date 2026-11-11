@@ -585,7 +585,7 @@ function mkDept(name,en,v,hl){const d={id:uid(),name,en:Object.assign({safety:tr
 function DEFAULT_METRICS(){return [
   {id:"pap",code:"PAP",name:"תכנון מול ביצוע",unit:"",dir:"higher",tol:"5",opening:true,show:"pct",goalPct:"95"},
   {id:"cr",code:"CR",name:"חיסכון בעלויות",unit:"M$",dir:"higher",tol:"5",opening:true,show:"value"},
-  {id:"qual",code:"COPQ",name:"עלות איכות לקויה (באלפי $)",unit:"K$",dir:"lower",tol:"0",opening:true,show:"value"},
+  {id:"qual",code:"COPQ",name:"עלות איכות לקויה (%)",unit:"%",dir:"lower",tol:"0",opening:true,show:"value"},
   {id:"safe",code:"אירועי בטיחות",name:"אירועי בטיחות מפעליים",unit:"",dir:"lower",tol:"0",opening:true,show:"value"},
   {id:"eff",code:"EFFICIENCY",name:"יעילות חודשית",unit:"%",dir:"higher",tol:"3",opening:true,show:"value"}]}
 function DEFAULT_PLANT(){return {pap:{actual:"1243500",target:"1300000"},cr:{actual:"2.32",target:"2.40"},qual:{actual:"2",target:"3"},safe:{actual:"0",target:"0"},eff:{actual:"87",target:"90"}}}
@@ -614,7 +614,7 @@ if(!state.metricsV8){const cr=state.metrics&&state.metrics.find(m=>m.id==="cr");
 try{if(!state.plant.hc){const sm=k=>(state.depts||[]).reduce((s,D)=>s+(Number(String((D.hc||{})[k]||"").replace(/,/g,""))||0),0);state.plant.hc={actual:String(sm("actual")||""),target:String(sm("target")||"")}}}catch(e){state.plant.hc={actual:"",target:""}}
 function fixMetrics(){(state.metrics||[]).forEach(m=>{
   if(m.id==="qual"&&(m.code==="איכות"||m.code==="אירועי איכות")){m.code="COPQ";if(!m.name||m.name==="אירועי איכות מפעליים")m.name="עלות איכות לקויה"}
-  if(m.id==="qual"&&m.code==="COPQ"&&!m.unitV2){m.unit="K$";if(m.name==="עלות איכות לקויה")m.name="עלות איכות לקויה (באלפי $)";m.unitV2=true}
+  if(m.id==="qual"&&m.code==="COPQ"&&!m.unitV3){m.unit="%";if(/^עלות איכות לקויה/.test(m.name||""))m.name="עלות איכות לקויה (%)";m.unitV2=true;m.unitV3=true}
   if(m.id==="safe"&&m.code==="בטיחות")m.code="אירועי בטיחות";
   if(m.show==="pct"&&m.goalPct===undefined)m.goalPct="95"})}
 fixMetrics();
@@ -627,8 +627,8 @@ const kv=(o,id)=>(o.kpis[id]=o.kpis[id]||{actual:"",target:""});
 const $=id=>document.getElementById(id);
 const R=s=>"‎"+s+"‎";
 const isLatin=s=>/^[\x20-\x7E]*$/.test(String(s||""));
-function num(s){const t=String(s??"").replace(/,/g,"").trim();return t===""?NaN:Number(t)}
-function fmt(s,unit){const t=String(s??"").trim();if(!t)return "–";const n=num(t);let out=t;
+function num(s){const t=String(s??"").replace(/[,%]/g,"").trim();return t===""?NaN:Number(t)}
+function fmt(s,unit){let t=String(s??"").trim();if(unit==="%")t=t.replace(/\s*%$/,"");if(!t)return "–";const n=num(t);let out=t;
   if(!isNaN(n)&&Math.abs(n)>=1000&&!t.includes("."))out=n.toLocaleString("en-US");
   if(!unit)return R(out);return /[֐-׿]/.test(unit)?R(out)+" "+unit:R(out+unit)}
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
