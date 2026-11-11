@@ -776,6 +776,9 @@ function layoutNotes(){const l=L(),{rect,text,oval}=l;rect(0,0,SW,SH,N.paper);
     oval(xr-14,y+9,14,14,N.orange);text(xr-colW,y,colW-30,step-10,null,{runs:leadRuns(t),size:two?18:20,color:N.ink});
     if(row<per-1&&(!two||i+1<ns.length))rect(xr-colW,y+step-14,colW,1,N.line)});
   return l.o}
+function measureRuns(runs,size,width){let m=window.__meas;
+  if(!m){m=document.createElement("div");m.setAttribute("aria-hidden","true");m.style.cssText="position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;z-index:-1;direction:rtl;white-space:pre-wrap;font-family:Assistant,Arial,sans-serif;line-height:1.3;text-align:right;box-sizing:border-box";document.body.appendChild(m);window.__meas=m}
+  m.style.fontSize=size+"px";m.style.width=width+"px";m.innerHTML=runs.map(r=>`<span style="font-weight:${r.bold?700:400}">${esc(r.t)}</span>`).join("");return Math.ceil(m.getBoundingClientRect().height)}
 function layoutPage(){const l=L(),{rect,text,img,oval}=l;
   rect(0,0,SW,SH,N.paper);
   fizz(l,[[40,292,12],[742,300,9],[384,560,10],[60,800,14],[730,792,11],[420,300,7]]);
@@ -809,16 +812,16 @@ function layoutPage(){const l=L(),{rect,text,img,oval}=l;
   const ns=lines(state.notes,8);
   if(!ns.length)text(52,ny+78,690,24,"הוסיפו הערות בלשונית \"הערות כלליות\"",{size:15,color:N.muted});
   else{/* size each note by its real text length, so long notes wrap instead of overlapping */
-    const y0=ny+76,avail=ny+nh-14-y0,mc=document.createElement("canvas").getContext("2d");
-    const plan=(two,size)=>{const colW=two?(690-30)/2:690;mc.font="400 "+size+"px Assistant, Arial, sans-serif";
-      const hs=ns.map(t=>Math.max(1,Math.ceil(mc.measureText(t).width*1.12/(colW-24)))*size*1.32+12);
+    const y0=ny+76,avail=ny+nh-14-y0;
+    const plan=(two,size)=>{const colW=two?(690-30)/2:690;
+      const hs=ns.map(t=>measureRuns(leadRuns(t),size,colW-20)+10);
       const half=two?Math.ceil(ns.length/2):ns.length,c1=hs.slice(0,half).reduce((a,b)=>a+b,0),c2=hs.slice(half).reduce((a,b)=>a+b,0);
       return {two,size,colW,hs,half,fits:Math.max(c1,c2)<=avail}};
     const order=ns.length>4?[[true,15],[true,14],[true,13],[false,13],[true,12],[false,12],[true,11]]:[[false,15],[false,14],[false,13],[true,14],[false,12],[true,13],[true,12],[false,11]];
     let P=null;for(const [two,s] of order){const r=plan(two,s);if(r.fits){P=r;break}}
     if(!P)P=plan(ns.length>4,11);
     const ys=[y0,y0];ns.forEach((tx,i)=>{const col=P.two&&i>=P.half?1:0,xr=742-col*(P.colW+30),y=ys[col],h=P.hs[i];
-      oval(xr-10,y+P.size*0.42,10,10,N.orange);text(xr-P.colW,y,P.colW-20,h-8,null,{runs:leadRuns(tx),size:P.size,color:N.ink});ys[col]+=h})}
+      oval(xr-10,y+P.size*0.42,10,10,N.orange);text(xr-P.colW,y,P.colW-20,h-6,null,{runs:leadRuns(tx),size:P.size,color:N.ink});ys[col]+=h})}
   return l.o}
 function slides(){return [{key:"open",title:"סיכום חודשי – A4",ops:()=>layoutPage()}]}
 
@@ -1025,13 +1028,27 @@ function carryOver(prev){/* new month: keep targets and structure, clear what is
   const P=clone(prev.plant||{});Object.values(P.kpis||{}).forEach(k=>{k.actual=""});if(P.hc)P.hc.actual="";
   const D=clone(prev.depts||[]);D.forEach(d=>{Object.values(d.kpis||{}).forEach(k=>{k.actual=""});if(d.hc)d.hc.actual="";if(d.safety){d.safety.acc="";}d.highlights=""});
   return {plant:P,depts:D,notes:""}}
+function inheritTargets(dst,prev){/* empty targets take the previous month's value; filled ones are kept */
+  if(!prev||!prev.plant)return dst;dst.plant=dst.plant||{};dst.plant.kpis=dst.plant.kpis||{};
+  Object.entries(prev.plant.kpis||{}).forEach(([id,k])=>{const d=dst.plant.kpis[id]=dst.plant.kpis[id]||{actual:"",target:""};if(String(d.target??"").trim()===""&&k&&k.target!==undefined)d.target=k.target});
+  const ph=prev.plant.hc||{};dst.plant.hc=dst.plant.hc||{actual:"",target:""};if(String(dst.plant.hc.target??"").trim()===""&&ph.target)dst.plant.hc.target=ph.target;
+  (dst.depts||[]).forEach(d=>{const p=(prev.depts||[]).find(x=>x.id===d.id);if(!p)return;d.hc=d.hc||{};if(!d.hc.target&&p.hc&&p.hc.target)d.hc.target=p.hc.target;
+    d.kpis=d.kpis||{};Object.entries(p.kpis||{}).forEach(([id,k])=>{const x=d.kpis[id]=d.kpis[id]||{actual:"",target:""};if(!x.target&&k.target)x.target=k.target})});
+  return dst}
+async function prevMonthDoc(key){/* latest earlier month, with any of its empty targets filled from the months before it */
+  const keys=(DB.months||[]).filter(k=>k<key).sort().reverse().slice(0,12);if(!keys.length||!DB.db)return null;let acc=null;
+  for(const k of keys){let d=null;try{const s=await DB.db.doc("months/"+k).get();d=s.exists?s.data():null}catch(e){}
+    if(!d)continue;acc=acc?inheritTargets(acc,d):clone(d);
+    const P=acc.plant||{},empty=Object.values(P.kpis||{}).some(x=>String(x.target??"").trim()==="")||!(P.hc&&P.hc.target);if(!empty)break}
+  return acc}
 async function openMonth(m,y){
   if(!DB.db){state.month=+m;state.year=String(y);$("month").value=state.month;$("year").value=state.year;touched();refresh(true);return}
   if(DB.dirty){clearTimeout(dbT);await dbFlush()}
   const prev={plant:state.plant,depts:state.depts};
   state.month=+m;state.year=String(y);$("month").value=state.month;$("year").value=state.year;
   let body=null;try{const s=await DB.db.doc("months/"+mkey(m,y)).get();if(s.exists)body=s.data()}catch(e){}
-  const src=body?clone(body):carryOver(prev);
+  const pd=await prevMonthDoc(mkey(m,y));
+  const src=inheritTargets(body?clone(body):carryOver(pd||prev),pd);
   state.plant=src.plant||state.plant;state.depts=src.depts||state.depts;state.notes=src.notes||"";
   if(!state.plant.hc)state.plant.hc={actual:"",target:""};
   normalize();state.sample=false;$("sampleBanner").hidden=true;
@@ -1056,7 +1073,7 @@ $("history").addEventListener("change",e=>{const k=e.target.value;if(!k)return;c
     const ms=await db.collection("months").get();DB.months=ms.docs.map(d=>d.id).sort().reverse();
     const cur=mkey(state.month,state.year);
     if(DB.months.length){const target=DB.months.includes(cur)?cur:DB.months[0];const s=await db.doc("months/"+target).get();
-      if(s.exists){const b=clone(s.data());state.month=b.month;state.year=String(b.year);state.plant=b.plant||state.plant;state.depts=b.depts||state.depts;state.notes=b.notes||"";if(!state.plant.hc)state.plant.hc={actual:"",target:""};state.sample=false}
+      if(s.exists){const b=inheritTargets(clone(s.data()),await prevMonthDoc(target));state.month=b.month;state.year=String(b.year);state.plant=b.plant||state.plant;state.depts=b.depts||state.depts;state.notes=b.notes||"";if(!state.plant.hc)state.plant.hc={actual:"",target:""};state.sample=false}
       setDbStatus("נטען ✓","ok")}
     else if(!state.sample){DB.dirty=true;await dbFlush()}
     else setDbStatus("הנתונים יישמרו כאן אוטומטית","");
