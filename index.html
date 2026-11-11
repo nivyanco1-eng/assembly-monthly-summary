@@ -585,7 +585,7 @@ function mkDept(name,en,v,hl){const d={id:uid(),name,en:Object.assign({safety:tr
 function DEFAULT_METRICS(){return [
   {id:"pap",code:"PAP",name:"תכנון מול ביצוע",unit:"",dir:"higher",tol:"5",opening:true,show:"pct",goalPct:"95"},
   {id:"cr",code:"CR",name:"חיסכון בעלויות",unit:"M$",dir:"higher",tol:"5",opening:true,show:"value"},
-  {id:"qual",code:"COPQ",name:"עלות איכות לקויה",unit:"",dir:"lower",tol:"0",opening:true,show:"value"},
+  {id:"qual",code:"COPQ",name:"עלות איכות לקויה (באלפי $)",unit:"K$",dir:"lower",tol:"0",opening:true,show:"value"},
   {id:"safe",code:"אירועי בטיחות",name:"אירועי בטיחות מפעליים",unit:"",dir:"lower",tol:"0",opening:true,show:"value"},
   {id:"eff",code:"EFFICIENCY",name:"יעילות חודשית",unit:"%",dir:"higher",tol:"3",opening:true,show:"value"}]}
 function DEFAULT_PLANT(){return {pap:{actual:"1243500",target:"1300000"},cr:{actual:"2.32",target:"2.40"},qual:{actual:"2",target:"3"},safe:{actual:"0",target:"0"},eff:{actual:"87",target:"90"}}}
@@ -614,6 +614,7 @@ if(!state.metricsV8){const cr=state.metrics&&state.metrics.find(m=>m.id==="cr");
 try{if(!state.plant.hc){const sm=k=>(state.depts||[]).reduce((s,D)=>s+(Number(String((D.hc||{})[k]||"").replace(/,/g,""))||0),0);state.plant.hc={actual:String(sm("actual")||""),target:String(sm("target")||"")}}}catch(e){state.plant.hc={actual:"",target:""}}
 function fixMetrics(){(state.metrics||[]).forEach(m=>{
   if(m.id==="qual"&&(m.code==="איכות"||m.code==="אירועי איכות")){m.code="COPQ";if(!m.name||m.name==="אירועי איכות מפעליים")m.name="עלות איכות לקויה"}
+  if(m.id==="qual"&&m.code==="COPQ"&&!m.unitV2){m.unit="K$";if(m.name==="עלות איכות לקויה")m.name="עלות איכות לקויה (באלפי $)";m.unitV2=true}
   if(m.id==="safe"&&m.code==="בטיחות")m.code="אירועי בטיחות";
   if(m.show==="pct"&&m.goalPct===undefined)m.goalPct="95"})}
 fixMetrics();
@@ -840,7 +841,7 @@ function tabsList(){return [{key:"open",label:"פתיחה"},{key:"notes",label:"
 let tab="open",cur=0;
 function paneOpen(){const P=state.plant;let h="";
   const om=state.metrics.filter(m=>m.opening);
-  h+=sec("מדדים – כלל המפעל","",om.length?om.map(m=>`<div style="display:grid;gap:4px"><b style="font-size:13.5px">${esc(m.code)} · ${esc(m.name||"")}</b><div class="grid2">${field(m.show==="pct"?"תכנון":"יעד","p_"+m.id+"_t","num","text",'inputmode="decimal"')}${field(m.show==="pct"?"ביצוע":"בפועל","p_"+m.id+"_a","num","text",'inputmode="decimal"')}</div>${m.show==="pct"?field("יעד ביצוע (%)","p_"+m.id+"_g","num","text",'inputmode="decimal"'):""}</div>`).join("")+`<p class="hint">ב-PAP הצבע נקבע לפי אחוז הביצוע מול יעד הביצוע. באירועי בטיחות: יעד 0 פירושו שכל אירוע מסומן באדום.</p>`:`<p class="hint">אין מדדים שמסומנים להצגה בשקופית הפתיחה. מסמנים אותם בלשונית "מדדים".</p>`);
+  h+=sec("מדדים – כלל המפעל","",om.length?om.map(m=>`<div style="display:grid;gap:4px"><b style="font-size:13.5px">${esc(m.code)} · ${esc(m.name||"")}</b><div class="grid2">${field(m.show==="pct"?"תכנון":"יעד","p_"+m.id+"_t","num","text",'inputmode="decimal"')}${field(m.show==="pct"?"ביצוע":"בפועל","p_"+m.id+"_a","num","text",'inputmode="decimal"')}</div>${m.show==="pct"?field("יעד ביצוע (%)","p_"+m.id+"_g","num","text",'inputmode="decimal"'):""}</div>`).join("")+`<p class="hint">COPQ נכתב בדולרים ובאלפים: למשל 118 = 118,000$. ב-PAP הצבע נקבע לפי אחוז הביצוע מול יעד הביצוע. באירועי בטיחות: יעד 0 פירושו שכל אירוע מסומן באדום.</p>`:`<p class="hint">אין מדדים שמסומנים להצגה בשקופית הפתיחה. מסמנים אותם בלשונית "מדדים".</p>`);
   om.forEach(m=>{const k=kv(P,m.id);F("p_"+m.id+"_a",()=>k.actual,v=>k.actual=v);F("p_"+m.id+"_t",()=>k.target,v=>k.target=v);if(m.show==="pct")F("p_"+m.id+"_g",()=>m.goalPct,v=>m.goalPct=v)});
   P.hc=P.hc||{actual:"",target:""};
   h+=sec("משאבי אנוש – מצבת עובדים","HR",`<div class="grid2">${field("תקינה","p_hc_t","num","text",'inputmode="numeric"')}${field("מצבת עובדים","p_hc_a","num","text",'inputmode="numeric"')}</div>`);
